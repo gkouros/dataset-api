@@ -3,6 +3,8 @@
     Author: wangpeng54@baidu.com
     Date: 2018/6/10
 """
+import sys
+sys.path.append("../")
 
 import argparse
 import cv2
