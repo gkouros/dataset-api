@@ -152,14 +152,15 @@ class ApolloScape(object):
         ROOT = self._data_dir + '3d_car_instance/' if self._args is None else \
             self._args.data_dir
         split = self._args.split if hasattr(
-            self._args, 'split') else 'sample_data'
+            self._args, 'split') else ''
+        print(ROOT)
 
         self._data_config['image_dir'] = ROOT + '%s/images/' % split
         self._data_config['pose_dir'] = ROOT + '%s/car_poses/' % split
         self._data_config['train_list'] = ROOT + '%s/split/train.txt'
         self._data_config['val_list'] = ROOT + '%s/split/val.txt'
 
-        self._data_config['car_model_dir'] = ROOT + 'car_models/'
+        self._data_config['car_model_dir'] = ROOT + '/car_models_json/'
 
         return self._data_config
 
@@ -168,7 +169,7 @@ class ApolloScape(object):
         """
         ROOT = self._data_dir + 'self_localization/' if self._args is None else \
             self._args.data_dir
-        split = self._args.split if hasattr(self._args, 'split') else 'sample_data'
+        split = self._args.split if hasattr(self._args, 'split') else ''
 
         self._data_config['image_dir'] = ROOT + '%s/%s/image/' % (split, Road)
         self._data_config['pose_dir'] = ROOT + '%s/%s/pose/' % (split, Road)

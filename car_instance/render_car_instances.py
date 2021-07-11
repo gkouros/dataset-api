@@ -56,12 +56,29 @@ class CarPoseVisualizer(object):
         self.car_models = OrderedDict([])
         logging.info('loading %d car models' % len(car_models.models))
         for model in car_models.models:
-            car_model = '%s/%s.pkl' % (self._data_config['car_model_dir'],
+            car_model = '%s/%s.json' % (self._data_config['car_model_dir'],
                                        model.name)
-            with open(car_model) as f:
-                self.car_models[model.name] = pkl.load(f)
-                # fix the inconsistency between obj and pkl
+            with open(car_model, 'rb') as f:
+                self.car_models[model.name] = json.load(f)
+                self.car_models[model.name]['vertices'] = np.array(
+                    self.car_models[model.name]['vertices'])
+                # fix the inconsistency between obj and json
                 self.car_models[model.name]['vertices'][:, [0, 1]] *= -1
+
+    def render_car_cv2(self,  pose, car_name, image):
+            car = self.car_models[car_name]
+            pose = np.array(pose)
+            # project 3D points to 2d image plane
+            rmat = uts.euler_angles_to_rotation_matrix(pose[:3])
+            rvect, _ = cv2.Rodrigues(rmat)
+            imgpts, jac = cv2.projectPoints(np.float32(car['vertices']), rvect, pose[3:], self.intrinsic, distCoeffs=None)
+            mask = np.zeros(image.shape)
+            for face in np.array(car['faces']) - 1:
+                pts = np.array([[imgpts[idx, 0, 0], imgpts[idx, 0, 1]] for idx in face], np.int32)
+                pts = pts.reshape((-1, 1, 2))
+                cv2.polylines(mask, [pts], True, (0, 255, 0), thickness=1)
+
+            return mask
 
     def render_car(self, pose, car_name):
         """Render a car instance given pose and car_name
@@ -141,7 +158,6 @@ class CarPoseVisualizer(object):
 
         return image_out, intrinsic_out
 
-
     def showAnn(self, image_name):
         """Show the annotation of a pose file in an image
         Input:
@@ -152,6 +168,42 @@ class CarPoseVisualizer(object):
             image_vis: an image show the overlap of car model and image
         """
 
+        car_pose_file = '%s/%s.json' % (self._data_config['pose_dir'], image_name)
+        with open(car_pose_file) as f:
+            car_poses = json.load(f)
+        image_file = '%s/%s.jpg' % (self._data_config['image_dir'], image_name)
+        image = cv2.imread(image_file, cv2.IMREAD_UNCHANGED)[:, :, ::-1]
+
+        intrinsic = self.dataset.get_intrinsic(image_name)
+        image, self.intrinsic = self.rescale(image, intrinsic)
+
+        merged_image = image.copy()
+        mask_all = np.zeros(image.shape)
+        for i, car_pose in enumerate(car_poses):
+            car_name = car_models.car_id2name[car_pose['car_id']].name
+            mask = self.render_car_cv2(car_pose['pose'], car_name, image)
+            mask_all += mask
+
+        mask_all = mask_all * 255 / mask_all.max()
+
+        alpha = 0.5
+        cv2.addWeighted(image.astype(np.uint8), 1, mask_all.astype(np.uint8), 0.2, 0, merged_image)
+
+        cv2.imshow('', merged_image.astype(np.uint8))
+        cv2.waitKey(0)
+
+        # return image, mask, depth
+
+
+    def showAnn_bak(self, image_name):
+        """Show the annotation of a pose file in an image
+        Input:
+            image_name: the name of image
+        Output:
+            depth: a rendered depth map of each car
+            masks: an instance mask of the label
+            image_vis: an image show the overlap of car model and image
+        """
         car_pose_file = '%s/%s.json' % (
             self._data_config['pose_dir'], image_name)
         with open(car_pose_file) as f:
@@ -283,7 +335,7 @@ if __name__ == '__main__':
                         help='the dir of ground truth')
     parser.add_argument('--data_dir', default='../apolloscape/3d_car_instance_sample/',
                         help='the dir of ground truth')
-    parser.add_argument('--split', default='sample_data', help='split for visualization')
+    parser.add_argument('--split', default='/sample_data', help='split for visualization')
     args = parser.parse_args()
     assert args.image_name
 
@@ -299,6 +351,4 @@ if __name__ == '__main__':
     visualizer = CarPoseVisualizer(args)
     visualizer.load_car_models()
     visualizer.showAnn(args.image_name)
-
-
 

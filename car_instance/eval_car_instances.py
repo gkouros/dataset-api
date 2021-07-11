@@ -11,10 +11,14 @@ import datetime
 import argparse
 import time
 import copy
+import sys
+sys.path.append('..')
+
 import utils.eval_utils as euts
 
 from collections import defaultdict
 from collections import namedtuple
+
 
 Criterion = namedtuple('Criterion', [
     'shapeSim',  # Criterion for shape similarity
